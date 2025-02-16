@@ -1,0 +1,35 @@
+from fastapi import FastAPI
+import joblib
+from pydantic import BaseModel
+
+# Load trained models & vectorizer
+nb_model = joblib.load('naive_bayes_model.pkl')
+log_reg_model = joblib.load('logistic_regression_model.pkl')
+vectorizer = joblib.load('tfidf_vectorizer.pkl')
+
+app = FastAPI()
+
+class InputData(BaseModel):
+    text: str
+
+@app.post("/predict/")
+def predict(data: InputData, model_type: str = "naive_bayes"):
+    # Convert input text to TF-IDF
+    transformed_text = vectorizer.transform([data.text])
+    
+    # Choose model
+    if model_type == "naive_bayes":
+        prediction = nb_model.predict(transformed_text)[0]
+    elif model_type == "logistic_regression":
+        prediction = log_reg_model.predict(transformed_text)[0]
+    else:
+        return {"error": "Invalid model type. Choose 'naive_bayes' or 'logistic_regression'."}
+    
+    return {"predicted_specialty": prediction}
+
+import os
+import uvicorn
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))  # Use Render's PORT
+    uvicorn.run(app, host="0.0.0.0", port=port)
